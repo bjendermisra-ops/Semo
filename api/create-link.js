@@ -1,6 +1,7 @@
 import Razorpay from 'razorpay';
 
 export default async function handler(req, res) {
+    // CORS Setup
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -27,11 +28,10 @@ export default async function handler(req, res) {
             key_secret: process.env.RAZORPAY_KEY_SECRET,
         });
 
+        // Bilkul clean aur standard payload (No extra fields)
         const paymentLink = await instance.paymentLink.create({
             amount: amount * 100,
             currency: "INR",
-            accept_partial: false,
-            first_payment_min_amount: amount * 100,
             description: `Donation for ${seva}`,
             customer: {
                 name: name,
@@ -50,7 +50,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ payment_url: paymentLink.short_url });
     } catch (error) {
         console.error(error);
-        // Razorpay ka original error message return karega (No guessing)
         const errorMessage = error.description || (error.error && error.error.description) || error.message || 'Backend payment generation failed';
         return res.status(500).json({ error: errorMessage });
     }
