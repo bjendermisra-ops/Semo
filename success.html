@@ -47,8 +47,8 @@
             <div class="receipt-row"><span>Date & Time:</span> <span id="r-time"></span></div>
         </div>
 
-        <div class="notice-badge">
-            Success! Ab aap is screen ko close karke Devotional Seva app par wapas ja sakte hain.
+        <div class="notice-badge" id="timer-text">
+            Success! App par wapas lauta ja raha hai (3s)...
         </div>
     </div>
 
@@ -66,7 +66,23 @@
             document.getElementById('r-seva').innerText = seva;
             document.getElementById('r-time').innerText = dateTimeStr;
 
+            // Device ke database/live feed mein save karna
             saveDonation(name, amount, dateTimeStr);
+
+            // Play Store App Package Name
+            const PACKAGE_NAME = "iskcon.hadapsar"; 
+
+            // Auto-redirect 3-second timer
+            let seconds = 3;
+            const timer = setInterval(() => {
+                seconds--;
+                document.getElementById('timer-text').innerText = `Success! App par wapas lauta ja raha hai (${seconds}s)...`;
+                if (seconds <= 0) {
+                    clearInterval(timer);
+                    // Android OS framework call to close Chrome Custom Tab and open the App
+                    window.location.href = `intent://#Intent;package=${PACKAGE_NAME};scheme=https;end;`;
+                }
+            }, 1000);
         };
 
         function saveDonation(name, amount, time) {
