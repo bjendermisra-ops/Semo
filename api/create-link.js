@@ -1,8 +1,7 @@
 import Razorpay from 'razorpay';
 
 export default async function handler(req, res) {
-    // CORS Setup
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -51,6 +50,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ payment_url: paymentLink.short_url });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ error: 'Backend payment generation failed', details: error.message });
+        // Razorpay ka original error message return karega (No guessing)
+        const errorMessage = error.description || (error.error && error.error.description) || error.message || 'Backend payment generation failed';
+        return res.status(500).json({ error: errorMessage });
     }
 }
