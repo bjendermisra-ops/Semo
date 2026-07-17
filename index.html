@@ -408,23 +408,29 @@
                     })
                 });
 
-                const data = await response.json();
-                
-                if (data.payment_url) {
-                    const a = document.createElement('a');
-                    a.href = data.payment_url;
-                    a.target = '_blank';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    
-                    closeModal('payment-modal');
+                // Status 200 checks
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.payment_url) {
+                        const a = document.createElement('a');
+                        a.href = data.payment_url;
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        closeModal('payment-modal');
+                    } else {
+                        alert('Server Error: ' + (data.error || 'Unable to initiate payment gateway.'));
+                    }
                 } else {
-                    alert('Server Error: ' + (data.error || 'Unable to initiate payment gateway.'));
+                    // Browser alert with exact HTTP Status code and server response
+                    const errorText = await response.text();
+                    alert(`Vercel Server Error (Status ${response.status}): ${errorText || 'Internal Server Fail'}`);
                 }
             } catch (err) {
                 console.error(err);
-                alert('Secure Server Connection failed. Please check network and retry.');
+                alert(`Network/Browser Error: ${err.message}`);
             } finally {
                 payBtn.innerText = "Proceed to Payment";
                 payBtn.disabled = false;
