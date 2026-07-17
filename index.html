@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donate Now - Devotional Seva</title>
+    <!-- Firebase SDK v9 Compat -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --primary-color: #f28c28; 
+            --bg-color: #f7f9fa;
+            --text-color: #333;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; padding-bottom: 80px; }
+        
+        .header { background-color: var(--primary-color); color: white; text-align: center; padding: 15px; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .tabs-container { display: flex; justify-content: space-around; background: white; padding: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tab { padding: 8px 16px; border-radius: 20px; border: none; background: #e0e0e0; font-weight: bold; font-size: 14px; cursor: pointer; color: #555; }
+        .tab.active { background: var(--primary-color); color: white; }
+
+        .feed-container { max-width: 500px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
+        .seva-card { background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #eee; display: flex; flex-direction: column; }
+        .seva-img { width: 100%; height: 200px; object-fit: cover; }
+        .seva-info { padding: 15px; text-align: left; }
+        .seva-title { font-size: 16px; font-weight: bold; color: #a0522d; margin: 0 0 8px 0; }
+        .seva-desc { font-size: 13px; color: #666; line-height: 1.4; margin-bottom: 15px; }
+        .donate-btn { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 25px; font-weight: bold; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
+        .modal-card { background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; width: 100%; max-width: 500px; padding: 20px; max-height: 85vh; overflow-y: auto; box-sizing: border-box; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .modal-header { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; position: relative; }
+        .close-btn { position: absolute; right: 0; top: -5px; font-size: 24px; cursor: pointer; color: #888; background: none; border: none; }
+        
+        .amount-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .amt-btn { padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .amt-btn.selected { border-color: var(--primary-color); background: #fff3e6; color: var(--primary-color); }
+        
+        label { display: block; text-align: left; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        input[type="text"], input[type="number"], input[type="email"], input[type="tel"] { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        
+        .bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: center; z-index: 500; }
+        .live-btn { background: #333; color: white; border: none; padding: 10px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        
+        .donation-item { display: flex; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid #eee; align-items: center; }
+        .donor-details { text-align: left; }
+        .donor-name { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
+        .donor-time { font-size: 11px; color: #888; }
+        .donor-amt { font-weight: bold; color: green; font-size: 15px; }
+
+        /* Secure Real-time Toast Notification Ticker */
+        .toast-notification {
+            position: fixed;
+            bottom: 80px; 
+            left: 50%;
+            transform: translateX(-50%) translateY(120px); /* start completely hidden below screen */
+            background: rgba(0, 0, 0, 0.88);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            width: 90%;
+            max-width: 350px;
+            box-sizing: border-box;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .toast-notification.show {
+            transform: translateX(-50%) translateY(0); /* slide up into view */
+        }
+        .toast-emoji {
+            font-size: 20px;
+            animation: rotateEmoji 2s linear infinite;
+        }
+        @keyframes rotateEmoji {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast-content {
+            font-size: 13px;
+            font-weight: 500;
+            text-align: left;
+            line-height: 1.3;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="header">Donate Now</div>
+
+    <!-- Category Filters -->
+    <div class="tabs-container">
+        <button class="tab active" onclick="filterCategory('All')">All</button>
+        <button class="tab" onclick="filterCategory('Gau Seva')">Gau Seva</button>
+        <button class="tab" onclick="filterCategory('Temple')">Temple</button>
+        <button class="tab" onclick="filterCategory('Annadan')">Annadan</button>
+    </div>
+
+    <!-- Feed Cards Container -->
+    <div class="feed-container" id="feed-list">
+        <div class="seva-card" data-category="Gau Seva">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=500" alt="Gau Seva">
+            <div class="seva-info">
+                <div class="seva-title">Cow Care & Feeding (Gau Poshana)</div>
+                <div class="seva-desc">Feed hungry souls with love. Your prasadam brings nourishment to 90+ sacred cows daily.</div>
+                <button class="donate-btn" onclick="openAmountModal('Cow Care & Feeding (Gau Poshana)')">DONATE ❤</button>
+            </div>
+        </div>
+
+        <div class="seva-card" data-category="Gau Seva">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=500" alt="Gau Chikitsa">
+            <div class="seva-info">
+                <div class="seva-title">Cow Medical Treatment (Gau Chikitsa)</div>
+                <div class="seva-desc">Support emergency medical care, routine check-ups, and specialized treatments for injured cows.</div>
+                <button class="donate-btn" onclick="openAmountModal('Cow Medical Treatment (Gau Chikitsa)')">DONATE ❤</button>
+            </div>
+        </div>
+
+        <div class="seva-card" data-category="Temple">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1609137144814-7e9b08581e28?w=500" alt="Marble Seva">
+            <div class="seva-info">
+                <div class="seva-title">Sponsor Marble Seva</div>
+                <div class="seva-desc">By sponsoring marble, you help decorate the sacred floors and altars where Lord Krishna will be worshipped.</div>
+                <button class="donate-btn" onclick="openAmountModal('Sponsor Marble Seva')">DONATE ❤</button>
+            </div>
+        </div>
+
+        <div class="seva-card" data-category="Annadan">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1544025162-d76694265947?w=500" alt="Ekadashi Seva">
+            <div class="seva-info">
+                <div class="seva-title">Ekadashi Special Seva (Annadan)</div>
+                <div class="seva-desc">Sponsor special grain-free meals for fasting pilgrims and devotees.</div>
+                <button class="donate-btn" onclick="openAmountModal('Ekadashi Special Seva')">DONATE ❤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Bottom Bar -->
+    <div class="bottom-bar">
+        <button class="live-btn" onclick="openLiveDonationsModal()">👥 View Live Donations</button>
+    </div>
+
+    <!-- MODAL: Payment Form -->
+    <div id="payment-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span id="selected-seva-title">Seva Name</span>
+                <button class="close-btn" onclick="closeModal('payment-modal')">&times;</button>
+            </div>
+            
+            <div id="step-amount">
+                <h4 style="text-align: left; margin: 0 0 10px 0;">Select Donation Amount</h4>
+                <div class="amount-grid">
+                    <button class="amt-btn" onclick="selectAmount(500, this)">₹500</button>
+                    <button class="amt-btn" onclick="selectAmount(1000, this)">₹1000</button>
+                    <button class="amt-btn" onclick="selectAmount(1500, this)">₹1500</button>
+                    <button class="amt-btn" onclick="selectAmount(2000, this)">₹2000</button>
+                    <button class="amt-btn" onclick="selectAmount(5000, this)">₹5000</button>
+                    <button class="amt-btn" onclick="selectAmount(0, this)">Other</button>
+                </div>
+                <input type="number" id="custom-amount" class="hidden" placeholder="Enter custom amount" oninput="updateCustomAmount(this.value)">
+                
+                <button class="donate-btn" style="margin-top: 15px;" onclick="goToDonorInfo()">Proceed to Donor Info</button>
+            </div>
+
+            <div id="step-form" class="hidden">
+                <h4 style="text-align: left; margin: 0 0 15px 0;">Donor Information</h4>
+                <label>Full Name*</label>
+                <input type="text" id="donor-name" placeholder="Enter Full Name" required>
+
+                <label>Mobile Number*</label>
+                <input type="tel" id="donor-phone" placeholder="Enter Mobile Number" required>
+
+                <label>Email Address</label>
+                <input type="email" id="donor-email" placeholder="Enter Email (Optional)">
+
+                <button class="donate-btn" onclick="generateSecurePaymentLink()">Proceed to Payment</button>
+                <button class="amt-btn" style="width:100%; margin-top: 10px;" onclick="backToAmount()">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Live Donations List -->
+    <div id="live-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="border-radius: 20px 20px 0 0;">
+            <div class="modal-header">
+                <span>Recent Live Donations</span>
+                <button class="close-btn" onclick="closeModal('live-modal')">&times;</button>
+            </div>
+            <div id="live-donations-list" style="max-height: 50vh; overflow-y: auto;">
+                <!-- Firebase Real-time data -->
+            </div>
+            <button class="donate-btn" style="margin-top: 20px; background: #555;" onclick="closeModal('live-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- Secure Live Toast Notification Ticker Markup -->
+    <div id="donation-toast" class="toast-notification">
+        <span class="toast-emoji">🌸</span>
+        <div class="toast-content">
+            <span id="toast-message">Anonymous just donated ₹500 for Gau Seva</span>
+        </div>
+    </div>
+
+    <script>
+        let currentSeva = '';
+        let selectedAmt = 500;
+
+        // Firebase Web SDK Configuration (Using your exact keys)
+        const firebaseConfig = {
+          apiKey: "AIzaSyAHksBlu9ue2p7AxXuUKALmEws5mscO908",
+          authDomain: "iskcon-bhuvaikuntha.firebaseapp.com",
+          projectId: "iskcon-bhuvaikuntha",
+          storageBucket: "iskcon-bhuvaikuntha.firebasestorage.app",
+          messagingSenderId: "87535383708",
+          appId: "1:87535383708:web:7548e3b7d4c807faafe959",
+          measurementId: "G-ZWEB9HM0K4"
+        };
+
+        // Initialize Firebase Web SDK Compat
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Global arrays to store data locally
+        let donationsArray = [];
+        let isFirstLoad = true;
+
+        // 100% Secure Real-Time Listener (onSnapshot)
+        db.collection('donations').orderBy('date', 'desc').limit(30).onSnapshot((snapshot) => {
+            donationsArray = [];
+            const changes = snapshot.docChanges();
+
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                // Safe formatting of Google server Timestamp
+                let timeStr = "Just now";
+                if (data.date) {
+                    const jsDate = data.date.toDate();
+                    timeStr = jsDate.toLocaleDateString() + ', ' + jsDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+                donationsArray.push({
+                    name: data.name,
+                    amount: data.amount,
+                    seva: data.seva,
+                    date: timeStr
+                });
+            });
+
+            // Update live modal list with latest data
+            renderPastDonations();
+
+            // Trigger the Dynamic Toast Ticker ONLY for new entries after the first load is complete
+            if (!isFirstLoad) {
+                changes.forEach((change) => {
+                    if (change.type === 'added') {
+                        const newDoc = change.doc.data();
+                        triggerLiveToast(newDoc.name, newDoc.amount, newDoc.seva);
+                    }
+                });
+            }
+            isFirstLoad = false;
+        }, (error) => {
+            console.error("Firestore real-time read error: ", error);
+        });
+
+        // Toast Trigger Animation
+        function triggerLiveToast(name, amount, seva) {
+            const toast = document.getElementById('donation-toast');
+            const message = document.getElementById('toast-message');
+            
+            // Clean description formatting
+            let shortSeva = seva.split('(')[0].trim();
+            message.innerHTML = `<strong style="color: #f28c28;">${name}</strong> just donated <strong>₹${amount}</strong> for ${shortSeva} 🌸`;
+            
+            // Slide Up
+            toast.classList.add('show');
+
+            // Slide Down after 4 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        // Render List inside Modal
+        function renderPastDonations() {
+            const container = document.getElementById('live-donations-list');
+            container.innerHTML = '';
+
+            if (donationsArray.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding: 20px; color: #999;">No donations captured yet!</div>';
+            } else {
+                donationsArray.forEach((item) => {
+                    const row = `
+                        <div class="donation-item">
+                            <div class="donor-details">
+                                <div class="donor-name">${item.name}</div>
+                                <div class="donor-time">${item.date}</div>
+                            </div>
+                            <div class="donor-amt">₹${item.amount}</div>
+                        </div>
+                    `;
+                    container.innerHTML += row;
+                });
+            }
+        }
+
+        function filterCategory(category) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                if(tab.innerText === category) tab.classList.add('active');
+                else tab.classList.remove('active');
+            });
+
+            const cards = document.querySelectorAll('.seva-card');
+            cards.forEach(card => {
+                if (category === 'All' || card.getAttribute('data-category') === category) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        }
+
+        function openAmountModal(sevaName) {
+            currentSeva = sevaName;
+            document.getElementById('selected-seva-title').innerText = sevaName;
+            document.getElementById('step-amount').classList.remove('hidden');
+            document.getElementById('step-form').classList.add('hidden');
+            document.getElementById('payment-modal').classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function selectAmount(amount, element) {
+            document.querySelectorAll('.amt-btn').forEach(btn => btn.classList.remove('selected'));
+            element.classList.add('selected');
+
+            if (amount === 0) {
+                document.getElementById('custom-amount').classList.remove('hidden');
+                selectedAmt = 0;
+            } else {
+                document.getElementById('custom-amount').classList.add('hidden');
+                selectedAmt = amount;
+            }
+        }
+
+        function updateCustomAmount(val) {
+            selectedAmt = Number(val);
+        }
+
+        function goToDonorInfo() {
+            if (selectedAmt <= 0) {
+                alert('Please enter or select a valid amount!');
+                return;
+            }
+            document.getElementById('step-amount').classList.add('hidden');
+            document.getElementById('step-form').classList.remove('hidden');
+        }
+
+        function backToAmount() {
+            document.getElementById('step-form').classList.add('hidden');
+            document.getElementById('step-amount').classList.remove('hidden');
+        }
+
+        // TRIGGER PAYMENT LINK CREATION (Calls Project 1 Local secure API)
+        async function generateSecurePaymentLink() {
+            const name = document.getElementById('donor-name').value;
+            const phone = document.getElementById('donor-phone').value;
+            const email = document.getElementById('donor-email').value || '';
+
+            if(!name || !phone) {
+                alert('Please fill Name and Mobile Number!');
+                return;
+            }
+
+            if (phone.length < 10) {
+                alert('Please enter a valid 10-digit mobile number!');
+                return;
+            }
+
+            const payBtn = document.querySelector('#step-form .donate-btn');
+            payBtn.innerText = "Securing Connection...";
+            payBtn.disabled = true;
+
+            try {
+                // Calling your Project 1 Local secure endpoint
+                const response = await fetch('/api/create-link.cjs', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        amount: selectedAmt,
+                        phone: phone,
+                        email: email,
+                        seva: currentSeva
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.payment_url) {
+                    const a = document.createElement('a');
+                    a.href = data.payment_url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    closeModal('payment-modal');
+                } else {
+                    alert('Server Error: ' + (data.error || 'Unable to initiate payment gateway.'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Secure Server Connection failed. Please check network and retry.');
+            } finally {
+                payBtn.innerText = "Proceed to Payment";
+                payBtn.disabled = false;
+            }
+        }
+
+        function openLiveDonationsModal() {
+            renderPastDonations();
+            document.getElementById('live-modal').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
