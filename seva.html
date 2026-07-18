@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Live Donations Feed - ISKCON Bhuvaikuntha</title>
+    
+    <!-- Firebase SDK Compat Core and Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <!-- FontAwesome Vector Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <style>
+        :root {
+            --primary-color: #f28c28; 
+            --bg-color: #f7f9fa;
+            --text-color: #333;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            margin: 0; 
+            padding: 0; 
+            padding-bottom: 30px; 
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Navbar with back button support */
+        .header { 
+            background-color: var(--primary-color); 
+            color: white; 
+            display: flex;
+            align-items: center;
+            padding: 15px; 
+            font-weight: bold; 
+            font-size: 18px; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        }
+        .back-btn {
+            color: white;
+            font-size: 1.25rem;
+            margin-right: 15px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .back-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* --- Saffron Language Switcher Bar --- */
+        .lang-chips-container { 
+            display: flex; 
+            gap: 5px; 
+            margin: 15px; 
+            background: rgba(150,150,150,0.06); 
+            padding: 5px; 
+            border-radius: 12px; 
+            border: 1.5px solid rgba(255,143,0,0.12); 
+        }
+        .lang-chip { 
+            flex: 1; 
+            text-align: center; 
+            padding: 8px 3px; 
+            font-size: 0.78rem; 
+            font-weight: 700; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: var(--transition); 
+            border: 1.5px solid transparent; 
+            color: var(--text-color); 
+            opacity: 0.75; 
+        }
+        .lang-chip.active { 
+            background: white; 
+            color: var(--primary-color); 
+            border-color: var(--primary-color); 
+            opacity: 1; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+        }
+
+        /* Realtime Status Indicator */
+        .live-status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 8px;
+            border-radius: 10px;
+            margin: 0 15px 15px 15px;
+            border: 1px solid #ffcdd2;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #d32f2f;
+            border-radius: 50%;
+            animation: pulseGlow 1s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            from { transform: scale(0.8); opacity: 0.5; }
+            to { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* --- Custom Premium Donation Cards List --- */
+        .feed-container { 
+            max-width: 500px; 
+            margin: 0 auto; 
+            padding: 0 15px; 
+            box-sizing: border-box; 
+        }
+        .donation-card-premium {
+            background: white;
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            border: 1px solid rgba(150,150,150,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            animation: cardEntrance 0.4s ease-out;
+            will-change: transform, opacity;
+        }
+        @keyframes cardEntrance {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-left-part {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            overflow: hidden;
+        }
+        .category-avatar-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Auto dynamic colors for category types */
+        .avatar-gau { background: linear-gradient(135deg, #efebe9, #d7ccc8); color: #4e342e; }
+        .avatar-temple { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #ff6f00; }
+        .avatar-annadan { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; }
+        .avatar-default { background: linear-gradient(135deg, #e3f2fd, #bbdefb); color: #1565c0; }
+
+        .card-details {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+            overflow: hidden;
+        }
+        .donor-name-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--text-color);
+            margin: 0 0 3px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .seva-badge-desc {
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #666;
+            margin: 0 0 3px 0;
+        }
+        .seva-badge-desc span {
+            color: var(--primary-color);
+        }
+        .card-timestamp-text {
+            font-size: 0.68rem;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .card-right-amount {
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: #2e7d32;
+            white-space: nowrap;
+        }
+
+        .no-data-hint {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header with Back Navigation go:home -->
+    <div class="header">
+        <a href="go:home" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+        <span id="header-text" data-key="header_title">Recent Live Donations</span>
+    </div>
+
+    <!-- Saffron Language Selector Chips (With Multi-Page Sync) -->
+    <div class="lang-chips-container shadow-sm">
+        <div class="lang-chip active" id="chip-en" onclick="setLanguage('en')">🇬🇧 English</div>
+        <div class="lang-chip" id="chip-hi" onclick="setLanguage('hi')">🇮🇳 हिन्दी</div>
+        <div class="lang-chip" id="chip-mr" onclick="setLanguage('mr')">🚩 मराठी</div>
+    </div>
+
+    <!-- Live Status Indicator bar -->
+    <div class="live-status-bar shadow-sm">
+        <div class="status-dot"></div>
+        <span id="status-live-indicator" data-key="live_status">🔴 Live Synchronized</span>
+    </div>
+
+    <!-- Dynamic Seva Cards Container -->
+    <div class="feed-container" id="realtime-donations-list-container">
+        <div class="no-data-hint" id="loading-spinner-message" data-key="connection_error">Connecting securely to the Altar...</div>
+    </div>
+
+    <script>
+        // --- 3 languages Translation Dictionary ---
+        const langData = {
+            "en": {
+                "header_title": "Recent Live Donations",
+                "no_donations": "No donations recorded yet!",
+                "connection_error": "Connecting securely to the Altar...",
+                "seva_badge": "Seva: ",
+                "live_status": "🔴 Live Synchronized"
+            },
+            "hi": {
+                "header_title": "हाल के लाइव दान",
+                "no_donations": "अभी तक कोई दान दर्ज नहीं हुआ है!",
+                "connection_error": "वेदी से सुरक्षित रूप से जुड़ रहे हैं...",
+                "seva_badge": "सेवा: ",
+                "live_status": "🔴 लाइव सिंक्रोनाइज़्ड"
+            },
+            "mr": {
+                "header_title": "थेट देणग्यांची यादी",
+                "no_donations": "अद्याप देणग्यांची नोंद नाही!",
+                "connection_error": "वेदीशी सुरक्षितपणे जोडत आहे...",
+                "seva_badge": "सेवा: ",
+                "live_status": "🔴 थेट जोडलेले"
+            }
+        };
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAHksBlu9ue2p7AxXuUKALmEws5mscO908",
+            authDomain: "iskcon-bhuvaikuntha.firebaseapp.com",
+            projectId: "iskcon-bhuvaikuntha",
+            storageBucket: "iskcon-bhuvaikuntha.firebasestorage.app",
+            messagingSenderId: "87535383708",
+            appId: "1:87535383708:web:7548e3b7d4c807faafe959",
+            measurementId: "G-ZWEB9HM0K4"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let globalLiveDonations = [];
+
+        // App lifecycle listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            // Apply language setup instantly on load from shared localStorage [1.4]
+            const savedLang = localStorage.getItem('lang') || 'en';
+            setLanguage(savedLang);
+
+            startLiveDonationsListener();
+        });
+
+        // Multi-Page Real-time Live Storage Sync Engine
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'lang') {
+                const newLang = event.newValue || 'en';
+                setLanguage(newLang);
+            }
+        });
+
+        // --- Language Switcher Logic ---
+        function setLanguage(lang) {
+            localStorage.setItem('lang', lang);
+            const texts = langData[lang];
+
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.getAttribute('data-key');
+                if (texts[key]) {
+                    el.innerText = texts[key];
+                }
+            });
+
+            // Update active Lang Chip layout
+            document.querySelectorAll('.lang-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            const activeChip = document.getElementById('chip-' + lang);
+            if (activeChip) {
+                activeChip.classList.add('active');
+            }
+
+            // Force refresh list to translate static badges
+            if (globalLiveDonations.length > 0) {
+                renderDonationsUI();
+            }
+        }
+
+        // --- Real-time Firestore Listener ---
+        function startLiveDonationsListener() {
+            db.collection("donations")
+              .orderBy("date", "desc")
+              .limit(50)
+              .onSnapshot((snapshot) => {
+                  globalLiveDonations = [];
+                  snapshot.forEach((doc) => {
+                      const data = doc.data();
+                      
+                      let dateVal = '';
+                      if (data.date) {
+                          const tDate = data.date.toDate ? data.date.toDate() : new Date(data.date);
+                          dateVal = tDate.toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                          });
+                      }
+
+                      globalLiveDonations.push({
+                          name: data.name || 'Anonymous Donor',
+                          amount: data.amount || 0,
+                          seva: data.seva || 'General Donation',
+                          date: dateVal
+                      });
+                  });
+
+                  renderDonationsUI();
+              }, (error) => {
+                  console.error("Firestore live update stream interrupted: ", error);
+                  const container = document.getElementById('realtime-donations-list-container');
+                  container.innerHTML = `<div class="no-data-hint">Offline / Error connecting to database.</div>`;
+              });
+        }
+
+        // --- Render Donations Cards Engine ---
+        function renderDonationsUI() {
+            const container = document.getElementById('realtime-donations-list-container');
+            container.innerHTML = '';
+            const lang = localStorage.getItem('lang') || 'en';
+
+            if (globalLiveDonations.length === 0) {
+                const noDonationText = langData[lang]["no_donations"] || "No donations recorded yet!";
+                container.innerHTML = `<div class="no-data-hint">${noDonationText}</div>`;
+                return;
+            }
+
+            globalLiveDonations.forEach(item => {
+                const cleanName = escapeHtml(item.name);
+                const cleanSeva = escapeHtml(item.seva);
+                const sevaPrefix = langData[lang]["seva_badge"] || "Seva: ";
+                
+                // Get dynamic icon & avatar gradient color depending on category keyword match
+                let avatarClass = "avatar-default";
+                let iconClass = "fa-heart";
+
+                if (cleanSeva.includes("Cow") || cleanSeva.includes("Gau") || cleanSeva.includes("गौ")) {
+                    avatarClass = "avatar-gau";
+                    iconClass = "fa-cow";
+                } else if (cleanSeva.includes("Temple") || cleanSeva.includes("Marble") || cleanSeva.includes("मंदिर")) {
+                    avatarClass = "avatar-temple";
+                    iconClass = "fa-gopuram";
+                } else if (cleanSeva.includes("Annadan") || cleanSeva.includes("Bhojan") || cleanSeva.includes("अन्नदान")) {
+                    avatarClass = "avatar-annadan";
+                    iconClass = "fa-bowl-food";
+                }
+
+                const cardHtml = `
+                    <div class="donation-card-premium">
+                        <div class="card-left-part">
+                            <div class="category-avatar-circle ${avatarClass}">
+                                <i class="fas ${iconClass}"></i>
+                            </div>
+                            <div class="card-details">
+                                <h4 class="donor-name-title">${cleanName}</h4>
+                                <div class="seva-badge-desc">${sevaPrefix}<span>${cleanSeva}</span></div>
+                                <span class="card-timestamp-text">${item.date}</span>
+                            </div>
+                        </div>
+                        <div class="card-right-amount">₹${item.amount}</div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        // Helper to prevent dynamic string injections
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
