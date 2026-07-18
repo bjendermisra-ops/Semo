@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Donate Now - Devotional Seva</title>
+    
+    <!-- Firebase SDK Compat Core and Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <!-- FontAwesome Vector Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <style>
+        :root {
+            --primary-color: #f28c28; 
+            --bg-color: #f7f9fa;
+            --text-color: #333;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            margin: 0; 
+            padding: 0; 
+            padding-bottom: 80px; 
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Navbar with back button support */
+        .header { 
+            background-color: var(--primary-color); 
+            color: white; 
+            display: flex;
+            align-items: center;
+            padding: 15px; 
+            font-weight: bold; 
+            font-size: 18px; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        }
+        .back-btn {
+            color: white;
+            font-size: 1.25rem;
+            margin-right: 15px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .back-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* --- Saffron Language Switcher Bar --- */
+        .lang-chips-container { 
+            display: flex; 
+            gap: 5px; 
+            margin: 15px; 
+            background: rgba(150,150,150,0.06); 
+            padding: 5px; 
+            border-radius: 12px; 
+            border: 1.5px solid rgba(255,143,0,0.12); 
+        }
+        .lang-chip { 
+            flex: 1; 
+            text-align: center; 
+            padding: 8px 3px; 
+            font-size: 0.78rem; 
+            font-weight: 700; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: var(--transition); 
+            border: 1.5px solid transparent; 
+            color: var(--text-color); 
+            opacity: 0.75; 
+        }
+        .lang-chip.active { 
+            background: white; 
+            color: var(--primary-color); 
+            border-color: var(--primary-color); 
+            opacity: 1; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+        }
+
+        .tabs-container { display: flex; justify-content: space-around; background: white; padding: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tab { padding: 8px 16px; border-radius: 20px; border: none; background: #e0e0e0; font-weight: bold; font-size: 14px; cursor: pointer; color: #555; }
+        .tab.active { background: var(--primary-color); color: white; }
+
+        .feed-container { max-width: 500px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
+        .seva-card { background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #eee; display: flex; flex-direction: column; }
+        .seva-img { width: 100%; height: 200px; object-fit: cover; }
+        .seva-info { padding: 15px; text-align: left; }
+        .seva-title { font-size: 16px; font-weight: bold; color: #a0522d; margin: 0 0 8px 0; }
+        .seva-desc { font-size: 13px; color: #666; line-height: 1.4; margin-bottom: 15px; }
+        .donate-btn { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 25px; font-weight: bold; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
+        .modal-card { background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; width: 100%; max-width: 500px; padding: 20px; max-height: 85vh; overflow-y: auto; box-sizing: border-box; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .modal-header { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; position: relative; }
+        .close-btn { position: absolute; right: 0; top: -5px; font-size: 24px; cursor: pointer; color: #888; background: none; border: none; }
+        
+        .amount-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .amt-btn { padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .amt-btn.selected { border-color: var(--primary-color); background: #fff3e6; color: var(--primary-color); }
+        
+        label { display: block; text-align: left; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        input[type="text"], input[type="number"], input[type="email"], input[type="tel"] { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        
+        .bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: center; z-index: 500; }
+        .live-btn { background: #333; color: white; border: none; padding: 10px 25px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        
+        .donation-item { display: flex; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid #eee; align-items: center; }
+        .donor-details { text-align: left; }
+        .donor-name { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
+        .donor-time { font-size: 11px; color: #888; }
+        .donor-amt { font-weight: bold; color: green; font-size: 15px; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Saffron Header with back navigation go:home -->
+    <div class="header">
+        <a href="go:home" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+        <span id="title-donate-now" data-key="header_title">Donate Now</span>
+    </div>
+
+    <!-- Saffron Language Selector Chips (With Multi-Page Sync) -->
+    <div class="lang-chips-container shadow-sm">
+        <div class="lang-chip active" id="chip-en" onclick="setLanguage('en')">🇬🇧 English</div>
+        <div class="lang-chip" id="chip-hi" onclick="setLanguage('hi')">🇮🇳 हिन्दी</div>
+        <div class="lang-chip" id="chip-mr" onclick="setLanguage('mr')">🚩 मराठी</div>
+    </div>
+
+    <!-- Category Filters -->
+    <div class="tabs-container">
+        <button class="tab active" id="tab-all" onclick="filterCategory('All')" data-key="tab_all">All</button>
+        <button class="tab" id="tab-gau" onclick="filterCategory('Gau Seva')" data-key="tab_gau">Gau Seva</button>
+        <button class="tab" id="tab-temple" onclick="filterCategory('Temple')" data-key="tab_temple">Temple</button>
+        <button class="tab" id="tab-annadan" onclick="filterCategory('Annadan')" data-key="tab_annadan">Annadan</button>
+    </div>
+
+    <!-- Feed Cards Container -->
+    <div class="feed-container" id="feed-list">
+        <!-- Card 1: Gau Seva -->
+        <div class="seva-card" data-category="Gau Seva">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=500" alt="Gau Seva">
+            <div class="seva-info">
+                <div class="seva-title" id="card1-title" data-key="card1_title">Cow Care & Feeding (Gau Poshana)</div>
+                <div class="seva-desc" id="card1-desc" data-key="card1_desc">Feed hungry souls with love. Your prasadam brings nourishment to 90+ sacred cows daily.</div>
+                <button class="donate-btn" onclick="openAmountModal('Cow Care & Feeding (Gau Poshana)')" data-key="btn_donate">DONATE ❤</button>
+            </div>
+        </div>
+
+        <!-- Card 2: Gau Seva -->
+        <div class="seva-card" data-category="Gau Seva">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=500" alt="Gau Chikitsa">
+            <div class="seva-info">
+                <div class="seva-title" id="card2-title" data-key="card2_title">Cow Medical Treatment (Gau Chikitsa)</div>
+                <div class="seva-desc" id="card2-desc" data-key="card2_desc">Support emergency medical care, routine check-ups, and specialized treatments for injured cows.</div>
+                <button class="donate-btn" onclick="openAmountModal('Cow Medical Treatment (Gau Chikitsa)')" data-key="btn_donate">DONATE ❤</button>
+            </div>
+        </div>
+
+        <!-- Card 3: Temple Seva -->
+        <div class="seva-card" data-category="Temple">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1609137144814-7e9b08581e28?w=500" alt="Marble Seva">
+            <div class="seva-info">
+                <div class="seva-title" id="card3-title" data-key="card3_title">Sponsor Marble Seva</div>
+                <div class="seva-desc" id="card3-desc" data-key="card3_desc">By sponsoring marble, you help decorate the sacred floors and altars where Lord Krishna will be worshipped.</div>
+                <button class="donate-btn" onclick="openAmountModal('Sponsor Marble Seva')" data-key="btn_donate">DONATE ❤</button>
+            </div>
+        </div>
+
+        <!-- Card 4: Annadan -->
+        <div class="seva-card" data-category="Annadan">
+            <img class="seva-img" src="https://images.unsplash.com/photo-1544025162-d76694265947?w=500" alt="Ekadashi Seva">
+            <div class="seva-info">
+                <div class="seva-title" id="card4-title" data-key="card4_title">Ekadashi Special Seva (Annadan)</div>
+                <div class="seva-desc" id="card4-desc" data-key="card4_desc">Sponsor special grain-free meals for fasting pilgrims and devotees.</div>
+                <button class="donate-btn" onclick="openAmountModal('Ekadashi Special Seva')" data-key="btn_donate">DONATE ❤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Bottom Bar -->
+    <div class="bottom-bar">
+        <button class="live-btn" onclick="openLiveDonationsModal()" data-key="view_live">👥 View Live Donations</button>
+    </div>
+
+    <!-- MODAL: Payment Form -->
+    <div id="payment-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span id="selected-seva-title">Seva Name</span>
+                <button class="close-btn" onclick="closeModal('payment-modal')">&times;</button>
+            </div>
+            
+            <!-- Step 1: Amount Selection -->
+            <div id="step-amount">
+                <h4 style="text-align: left; margin: 0 0 10px 0;" data-key="modal_amt_title">Select Donation Amount</h4>
+                <div class="amount-grid">
+                    <button class="amt-btn" onclick="selectAmount(500, this)">₹500</button>
+                    <button class="amt-btn" onclick="selectAmount(1000, this)">₹1000</button>
+                    <button class="amt-btn" onclick="selectAmount(1500, this)">₹1500</button>
+                    <button class="amt-btn" onclick="selectAmount(2000, this)">₹2000</button>
+                    <button class="amt-btn" onclick="selectAmount(5000, this)">₹5000</button>
+                    <button class="amt-btn" onclick="selectAmount(0, this)">Other</button>
+                </div>
+                <input type="number" id="custom-amount" class="hidden" placeholder="Enter custom amount" oninput="updateCustomAmount(this.value)">
+                
+                <button class="donate-btn" style="margin-top: 15px;" onclick="goToDonorInfo()" data-key="modal_proceed_info">Proceed to Donor Info</button>
+            </div>
+
+            <!-- Step 2: Donor Form -->
+            <div id="step-form" class="hidden">
+                <h4 style="text-align: left; margin: 0 0 15px 0;" data-key="modal_donor_title">Donor Information</h4>
+                <label data-key="label_name">Full Name*</label>
+                <input type="text" id="donor-name" placeholder="Enter Full Name" required>
+
+                <label data-key="label_phone">Mobile Number*</label>
+                <input type="tel" id="donor-phone" placeholder="Enter Mobile Number" required>
+
+                <label data-key="label_email">Email Address</label>
+                <input type="email" id="donor-email" placeholder="Enter Email (Optional)">
+
+                <button class="donate-btn" onclick="generateSecurePaymentLink()" data-key="btn_payment">Proceed to Payment</button>
+                <button class="amt-btn" style="width:100%; margin-top: 10px;" onclick="backToAmount()" data-key="btn_back">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Live Donations List -->
+    <div id="live-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="border-radius: 20px 20px 0 0;">
+            <div class="modal-header">
+                <span data-key="modal_recent_title">Recent Live Donations</span>
+                <button class="close-btn" onclick="closeModal('live-modal')">&times;</button>
+            </div>
+            <div id="live-donations-list" style="max-height: 50vh; overflow-y: auto;">
+                <!-- Live rows -->
+            </div>
+            <button class="donate-btn" style="margin-top: 20px; background: #555;" onclick="closeModal('live-modal')" data-key="btn_close">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 3 languages Translation Dictionary ---
+        const langData = {
+            "en": {
+                "header_title": "Donate Now",
+                "tab_all": "All",
+                "tab_gau": "Gau Seva",
+                "tab_temple": "Temple",
+                "tab_annadan": "Annadan",
+                "btn_donate": "DONATE ❤",
+                "card1_title": "Cow Care & Feeding (Gau Poshana)",
+                "card1_desc": "Feed hungry souls with love. Your prasadam brings nourishment to 90+ sacred cows daily.",
+                "card2_title": "Cow Medical Treatment (Gau Chikitsa)",
+                "card2_desc": "Support emergency medical care, routine check-ups, and specialized treatments for injured cows.",
+                "card3_title": "Sponsor Marble Seva",
+                "card3_desc": "By sponsoring marble, you help decorate the sacred floors and altars where Lord Krishna will be worshipped.",
+                "card4_title": "Ekadashi Special Seva (Annadan)",
+                "card4_desc": "Sponsor special grain-free meals for fasting pilgrims and devotees.",
+                "view_live": "👥 View Live Donations",
+                "modal_amt_title": "Select Donation Amount",
+                "modal_proceed_info": "Proceed to Donor Info",
+                "modal_donor_title": "Donor Information",
+                "label_name": "Full Name*",
+                "label_phone": "Mobile Number*",
+                "label_email": "Email Address",
+                "btn_payment": "Proceed to Payment",
+                "btn_back": "Back",
+                "btn_close": "Close",
+                "modal_recent_title": "Recent Live Donations",
+                "no_donations": "No donations yet!"
+            },
+            "hi": {
+                "header_title": "दान सेवा",
+                "tab_all": "सभी",
+                "tab_gau": "गौ सेवा",
+                "tab_temple": "मंदिर सेवा",
+                "tab_annadan": "अन्नदान",
+                "btn_donate": "दान करें ❤",
+                "card1_title": "गौ सेवा और चारा (गौ पोषण)",
+                "card1_desc": "प्यारी गायों को प्रेमपूर्वक भोजन कराएं। आपका प्रसाद दैनिक रूप से ९०+ पवित्र गायों को पोषण देता है।",
+                "card2_title": "गौ चिकित्सा (गौ चिकित्सा सेवा)",
+                "card2_desc": "घायल और बीमार गायों के लिए आपातकालीन चिकित्सा देखभाल, नियमित जांच और उपचार का समर्थन करें।",
+                "card3_title": "मार्बल सेवा प्रायोजित करें",
+                "card3_desc": "संगमरमर प्रायोजित करके, आप उन पवित्र फर्शों और वेदियों को सजाने में मदद करते हैं जहां भगवान कृष्ण की पूजा की जाएगी।",
+                "card4_title": "एकादशी विशेष सेवा (अन्नदान)",
+                "card4_desc": "व्रत रखने वाले तीर्थयात्रियों और भक्तों के लिए विशेष अनाज-मुक्त भोजन प्रायोजित करें।",
+                "view_live": "👥 लाइव दान देखें",
+                "modal_amt_title": "दान राशि चुनें",
+                "modal_proceed_info": "दाता जानकारी पर आगे बढ़ें",
+                "modal_donor_title": "दाता की जानकारी",
+                "label_name": "पूरा नाम*",
+                "label_phone": "मोबाइल नंबर*",
+                "label_email": "ईमेल पता",
+                "btn_payment": "भुगतान के लिए आगे बढ़ें",
+                "btn_back": "पीछे",
+                "btn_close": "बंद करें",
+                "modal_recent_title": "हाल के लाइव दान",
+                "no_donations": "अभी तक कोई दान नहीं!"
+            },
+            "mr": {
+                "header_title": "दान सेवा",
+                "tab_all": "सर्व",
+                "tab_gau": "गौ सेवा",
+                "tab_temple": "मंदिर सेवा",
+                "tab_annadan": "अन्नदान",
+                "btn_donate": "दान करा ❤",
+                "card1_title": "गौ सेवा आणि चारा (गौ पोषण)",
+                "card1_desc": "प्यारी गायींना प्रेमपूर्वक भोजन द्या. तुमचा प्रसाद दररोज ९०+ पवित्र गायींना पोषण देतो.",
+                "card2_title": "गौ वैद्यकीय उपचार (गौ चिकित्सा)",
+                "card2_desc": "जखमी आणि आजारी गायींसाठी तातडीची वैद्यकीय मदत, नियमित तपासणी आणि उपचारांना हातभार लावा.",
+                "card3_title": "संगमरमर सेवा प्रायोजित करा",
+                "card3_desc": "संगमरमर प्रायोजित करून, तुम्ही त्या पवित्र मजल्यांचे आणि वेदींचे सुशोभीकरण करण्यास मदत करता जिथे भगवान श्रीकृष्णाची पूजा केली जाईल.",
+                "card4_title": "एकादशी विशेष सेवा (अन्नदान)",
+                "card4_desc": "उपवास करणाऱ्या यात्रेकरूंसाठी आणि भक्तांसाठी विशेष धान्य-मुक्त भोजन प्रायोजित करा.",
+                "view_live": "👥 थेट दान पहा",
+                "modal_amt_title": "दान रक्कम निवडा",
+                "modal_proceed_info": "दाता माहितीवर जा",
+                "modal_donor_title": "दाता माहिती",
+                "label_name": "पूर्ण नाव*",
+                "label_phone": "मोबाईल नंबर*",
+                "label_email": "ईमेल पत्ता",
+                "btn_payment": "पैसे भरण्यासाठी पुढे जा",
+                "btn_back": "मागे",
+                "btn_close": "बंद करा",
+                "modal_recent_title": "थेट देणग्यांची यादी",
+                "no_donations": "अद्याप देणग्या नाहीत!"
+            }
+        };
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAHksBlu9ue2p7AxXuUKALmEws5mscO908",
+            authDomain: "iskcon-bhuvaikuntha.firebaseapp.com",
+            projectId: "iskcon-bhuvaikuntha",
+            storageBucket: "iskcon-bhuvaikuntha.firebasestorage.app",
+            messagingSenderId: "87535383708",
+            appId: "1:87535383708:web:7548e3b7d4c807faafe959",
+            measurementId: "G-ZWEB9HM0K4"
+        };
+
+        // Initialize Firebase Client
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let currentSeva = '';
+        let selectedAmt = 500;
+        let globalLiveDonations = [];
+
+        // App lifecycle listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            // Apply language setup instantly on load from shared localStorage [1.4]
+            const savedLang = localStorage.getItem('lang') || 'en';
+            setLanguage(savedLang);
+
+            startLiveDonationsListener();
+            
+            // Auto Parameter deep linking filter trigger
+            const urlParams = new URLSearchParams(window.location.search);
+            const category = urlParams.get('category');
+            if (category) {
+                let tabName = decodeURIComponent(category);
+                if (tabName === 'Gau Seva' || tabName === 'Gau' || tabName === 'Go seva') {
+                    filterCategory('Gau Seva');
+                } else if (tabName === 'Temple' || tabName === 'Temple Seva') {
+                    filterCategory('Temple');
+                } else if (tabName === 'Annadan' || tabName === 'Anna Dân Seva') {
+                    filterCategory('Annadan');
+                } else {
+                    filterCategory('All');
+                }
+            }
+        });
+
+        // Multi-Page Real-time Live Storage Sync Engine
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'lang') {
+                const newLang = event.newValue || 'en';
+                setLanguage(newLang);
+            }
+        });
+
+        // --- Language Switcher Logic ---
+        function setLanguage(lang) {
+            localStorage.setItem('lang', lang);
+            const texts = langData[lang];
+
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.getAttribute('data-key');
+                if (texts[key]) {
+                    el.innerText = texts[key];
+                }
+            });
+
+            // Update custom placeholders dynamically
+            const customAmtInput = document.getElementById('custom-amount');
+            if (customAmtInput && texts["modal_custom_placeholder"]) {
+                customAmtInput.placeholder = texts["modal_custom_placeholder"];
+            }
+
+            // Update active Lang Chip layout
+            document.querySelectorAll('.lang-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            const activeChip = document.getElementById('chip-' + lang);
+            if (activeChip) {
+                activeChip.classList.add('active');
+            }
+        }
+
+        // --- Real-time Firestore Listener ---
+        function startLiveDonationsListener() {
+            db.collection("donations")
+              .orderBy("date", "desc")
+              .limit(30)
+              .onSnapshot((snapshot) => {
+                  globalLiveDonations = [];
+                  snapshot.forEach((doc) => {
+                      const data = doc.data();
+                      
+                      let dateVal = '';
+                      if (data.date) {
+                          const tDate = data.date.toDate ? data.date.toDate() : new Date(data.date);
+                          dateVal = tDate.toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                          });
+                      }
+
+                      globalLiveDonations.push({
+                          name: data.name || 'Anonymous Donor',
+                          amount: data.amount || 0,
+                          date: dateVal
+                      });
+                  });
+              }, (error) => {
+                  console.error("Firestore live update stream interrupted: ", error);
+              });
+        }
+
+        function filterCategory(category) {
+            // Tab Selection Highlights
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            if (category === 'All') document.getElementById('tab-all').classList.add('active');
+            if (category === 'Gau Seva') document.getElementById('tab-gau').classList.add('active');
+            if (category === 'Temple') document.getElementById('tab-temple').classList.add('active');
+            if (category === 'Annadan') document.getElementById('tab-annadan').classList.add('active');
+
+            const cards = document.querySelectorAll('.seva-card');
+            cards.forEach(card => {
+                if (category === 'All' || card.getAttribute('data-category') === category) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        }
+
+        function openAmountModal(sevaName) {
+            currentSeva = sevaName;
+            document.getElementById('selected-seva-title').innerText = sevaName;
+            document.getElementById('step-amount').classList.remove('hidden');
+            document.getElementById('step-form').classList.add('hidden');
+            document.getElementById('payment-modal').classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function selectAmount(amount, element) {
+            document.querySelectorAll('.amt-btn').forEach(btn => btn.classList.remove('selected'));
+            element.classList.add('selected');
+
+            if (amount === 0) {
+                document.getElementById('custom-amount').classList.remove('hidden');
+                selectedAmt = 0;
+            } else {
+                document.getElementById('custom-amount').classList.add('hidden');
+                selectedAmt = amount;
+            }
+        }
+
+        function updateCustomAmount(val) {
+            selectedAmt = Number(val);
+        }
+
+        function goToDonorInfo() {
+            if (selectedAmt <= 0) {
+                alert('Please enter or select a valid amount!');
+                return;
+            }
+            document.getElementById('step-amount').classList.add('hidden');
+            document.getElementById('step-form').classList.remove('hidden');
+        }
+
+        function backToAmount() {
+            document.getElementById('step-form').classList.add('hidden');
+            document.getElementById('step-amount').classList.remove('hidden');
+        }
+
+        // SECURE API HANDOFF TO VERCEL BACKEND
+        async function generateSecurePaymentLink() {
+            const name = document.getElementById('donor-name').value;
+            const phone = document.getElementById('donor-phone').value;
+            const email = document.getElementById('donor-email').value || '';
+
+            if(!name || !phone) {
+                alert('Please fill Name and Mobile Number!');
+                return;
+            }
+
+            if (phone.length < 10) {
+                alert('Please enter a valid 10-digit mobile number!');
+                return;
+            }
+
+            const payBtn = document.querySelector('#step-form .donate-btn');
+            payBtn.innerText = "Securing Connection...";
+            payBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/create-link', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        amount: selectedAmt,
+                        phone: phone,
+                        email: email,
+                        seva: currentSeva
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.payment_url) {
+                    const a = document.createElement('a');
+                    a.href = data.payment_url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    closeModal('payment-modal');
+                } else {
+                    alert('Server Error: ' + (data.error || 'Unable to initiate payment gateway.'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Secure Server Connection failed. Please check network and retry.');
+            } finally {
+                payBtn.innerText = "Proceed to Payment";
+                payBtn.disabled = false;
+            }
+        }
+
+        function openLiveDonationsModal() {
+            const container = document.getElementById('live-donations-list');
+            container.innerHTML = '';
+            const lang = localStorage.getItem('lang') || 'en';
+
+            if (globalLiveDonations.length === 0) {
+                const noDonationText = langData[lang]["no_donations"] || "No donations yet!";
+                container.innerHTML = `<div style="text-align:center; padding: 20px; color: #999;">${noDonationText}</div>`;
+            } else {
+                globalLiveDonations.forEach(item => {
+                    const cleanName = escapeHtml(item.name);
+                    const row = `
+                        <div class="donation-item">
+                            <div class="donor-details">
+                                <div class="donor-name">${cleanName}</div>
+                                <div class="donor-time">${item.date}</div>
+                            </div>
+                            <div class="donor-amt">₹${item.amount}</div>
+                        </div>
+                    `;
+                    container.innerHTML += row;
+                });
+            }
+            document.getElementById('live-modal').classList.remove('hidden');
+        }
+
+        // Helper to prevent dynamic string injections
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
