@@ -29,14 +29,16 @@ export default async function handler(req, res) {
             key_secret: process.env.RAZORPAY_KEY_SECRET,
         });
 
-        // Creates payment link redirecting to secure-gate-pay page on success
+        const customerEmail = email || 'donor@iskcon.org';
+
+        // Bilkul clean aur standard payload (No extra fields)
         const paymentLink = await instance.paymentLink.create({
             amount: amount * 100,
             currency: "INR",
             description: `Donation for ${seva}`,
             customer: {
                 name: name,
-                email: email || 'donor@iskcon.org',
+                email: customerEmail,
                 contact: phone,
             },
             notify: {
@@ -44,7 +46,8 @@ export default async function handler(req, res) {
                 email: false,
             },
             reminder_enable: false,
-            callback_url: `https://secure-gate-pay.vercel.app/index.html?name=${encodeURIComponent(name)}&amount=${amount}&seva=${encodeURIComponent(seva)}`,
+            // Appends user filled email and phone directly to the redirect URL safely to bypass void@razorpay.com overrides
+            callback_url: `https://secure-gate-pay.vercel.app/index.html?name=${encodeURIComponent(name)}&amount=${amount}&seva=${encodeURIComponent(seva)}&phone=${phone}&email=${encodeURIComponent(customerEmail)}`,
             callback_method: "get"
         });
 
