@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
         const customerEmail = email || 'donor@iskcon.org';
 
-        // Bilkul clean aur standard payload (No extra fields)
+        // Bilkul clean aur standard payload (with secure metadata notes to prevent redirect stripping) [4]
         const paymentLink = await instance.paymentLink.create({
             amount: amount * 100,
             currency: "INR",
@@ -46,8 +46,12 @@ export default async function handler(req, res) {
                 email: false,
             },
             reminder_enable: false,
-            // Appends user filled email and phone directly to the redirect URL safely to bypass void@razorpay.com overrides
-            callback_url: `https://secure-gate-pay.vercel.app/index.html?name=${encodeURIComponent(name)}&amount=${amount}&seva=${encodeURIComponent(seva)}&phone=${phone}&email=${encodeURIComponent(customerEmail)}`,
+            // Secure metadata notes [4]
+            notes: {
+                real_email: customerEmail,
+                real_phone: phone
+            },
+            callback_url: `https://secure-gate-pay.vercel.app/index.html?name=${encodeURIComponent(name)}&amount=${amount}&seva=${encodeURIComponent(seva)}`,
             callback_method: "get"
         });
 
